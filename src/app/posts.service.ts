@@ -1,9 +1,9 @@
-import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { map, catchError } from 'rxjs/operators';
-import { Subject, throwError } from 'rxjs';
+import {Injectable} from '@angular/core';
+import {HttpClient, HttpEventType, HttpHeaders, HttpParams} from '@angular/common/http';
+import {catchError, map, tap} from 'rxjs/operators';
+import {Subject, throwError} from 'rxjs';
 
-import { Post } from './post.model';
+import {Post} from './post.model';
 
 @Injectable({ providedIn: 'root' })
 export class PostsService {
@@ -18,11 +18,15 @@ export class PostsService {
     this.http
       .post<{ name: string }>(
         this.URL,
-        postData
+        postData,
+        {
+          // change the kind of data you get back as response
+          observe: 'response'
+        }
       )
       .subscribe(
         responseData => {
-          console.log(responseData);
+          console.log(responseData.body);
         },
         error => {
           this.error.next(error.message);
@@ -31,9 +35,22 @@ export class PostsService {
   }
 
   fetchPosts() {
+    let searchParams = new HttpParams();
+    // return a new object when invoking this method append
+    searchParams = searchParams.append('print', 'pretty');
+    searchParams = searchParams.append('custom', 'key');
     return this.http
+      // kind of data returned between <>, returns a javascript object
       .get<{ [key: string]: Post }>(
-        this.URL
+        this.URL,
+      //add a header
+        {
+          headers: new HttpHeaders({"Custom-Header": "Hello"}),
+          // Change the format firebase is returning the data
+          // add the params at the end of the url
+          // https://ng-complete-guide-30215-default-rtdb.firebaseio.com/posts.json?print=pretty&custom=key
+          params: searchParams,
+        }
       )
       .pipe(
         map(responseData => {
@@ -56,7 +73,23 @@ export class PostsService {
 
   deletePosts() {
     return this.http.delete(
-      this.URL
-    );
+      this.URL, {
+        //
+        observe: 'events',
+        // parse and convert it to be a text response
+        responseType: 'text'
+      }
+    ).pipe(
+      /*
+      In your specific code, tap is used to log the event object emitted by the observable created by the delete HTTP request.
+      It allows you to observe what's happening during the HTTP request without altering the actual data being sent or received
+       */
+      tap(event => {
+        console.log(event);
+        // which means type is 0
+        if (event.type === HttpEventType.Sent) {
+          console.log("Request sent");
+        }
+    }));
   }
 }
